@@ -11,6 +11,7 @@ Face detection, recognition, and embedding extraction using [InsightFace](https:
 | `INSIGHT.md` | Minimal example: detect faces and get 512-d embeddings |
 | `test_insightface.py` | Smoke test using InsightFace's built-in demo image |
 | `insight_env/` | Python virtual environment (created by the setup script) |
+| `activate.custom` | Patched copy of the venv's `activate` script; the venv is always activated with this file |
 
 ## Licensing — important
 
@@ -47,9 +48,9 @@ restriction applies to the **pretrained model weights**.
 
 The script:
 
-1. Creates the `insight_env` virtual environment and patches its `activate`
-   script to export `ORT_MIGRAPHX_MODEL_CACHE_PATH` (idempotent — re-running
-   the script never double-patches, and a recreated venv is re-customized)
+1. Creates the `insight_env` virtual environment (kept **pristine**) and
+   generates `activate.custom` from a fresh copy of its `activate` script,
+   patched to export `ORT_MIGRAPHX_MODEL_CACHE_PATH`
 2. Installs dependencies (`numpy<2`, `opencv-python`, `tqdm`) and `insightface`
 3. **Replaces** the CPU-only `onnxruntime` wheel with the local MIGraphX build
 4. Verifies that `MIGraphXExecutionProvider` is registered
@@ -58,13 +59,24 @@ The script:
 ## Using the environment
 
 ```bash
-source insight_env/bin/activate
+source activate.custom
 # to leave the environment later:
 deactivate
 ```
 
-The `activate` script also exports `ORT_MIGRAPHX_MODEL_CACHE_PATH` (see
-[MIGraphX compile cache](#migraphx-compile-cache)) — don't skip it.
+`activate.custom` is the patched copy of the venv's `activate` script and is
+the only way to activate the environment: it exports
+`ORT_MIGRAPHX_MODEL_CACHE_PATH` (see
+[MIGraphX compile cache](#migraphx-compile-cache)). The venv's own
+`insight_env/bin/activate` is left pristine and does **not** set that
+variable, so sourcing it gives you the venv but a broken/slow GPU path —
+don't use it.
+
+`activate.custom` starts life as a copy of `insight_env/bin/activate`, so it
+may stop working if an upgrade changes the venv's activation script into an
+incompatible form (e.g., a venv re-creation or Python upgrade regenerates it).
+In that case, just re-run `./setup_insightface.sh`, which always re-copies
+the current venv script and re-applies the patch.
 
 ### Run the smoke test
 
@@ -121,7 +133,7 @@ The venv must use the locally built wheel, which **replaces** the CPU-only
 `onnxruntime` wheel that `pip install insightface` pulls in:
 
 ```bash
-source insight_env/bin/activate
+source activate.custom
 pip uninstall -y onnxruntime
 pip install --no-deps --force-reinstall \
     ../onnxruntime/onnxruntime/build/Linux/Release/dist/onnxruntime_migraphx-*.whl
@@ -169,7 +181,7 @@ check `ort.get_available_providers()` rather than assuming acceleration.
 ### MIGraphX compile cache
 
 MIGraphX compiles each graph with the ROCm compiler, which takes minutes on
-the first run. Sourcing `insight_env/bin/activate` exports
+the first run. Sourcing `activate.custom` exports
 `ORT_MIGRAPHX_MODEL_CACHE_PATH` (`~/.cache/migraphx`), which caches the
 compiled `.mxr` files, so only the first run is slow (~149 s cold vs ~3.6 s
 warm).
@@ -187,6 +199,6 @@ Failed to call function
 ```
 
 Pointing the EP at a real directory via `ORT_MIGRAPHX_MODEL_CACHE_PATH`
-bypasses the broken default. If you ever run without sourcing `activate`,
+bypasses the broken default. If you ever run without sourcing `activate.custom`,
 either export that variable yourself or pass `static_shape_sessions=False` to
 `FaceAnalysis` so the reference Session is reused instead of cloned.
