@@ -47,7 +47,9 @@ restriction applies to the **pretrained model weights**.
 
 The script:
 
-1. Creates the `insight_env` virtual environment
+1. Creates the `insight_env` virtual environment and patches its `activate`
+   script to export `ORT_MIGRAPHX_MODEL_CACHE_PATH` (idempotent — re-running
+   the script never double-patches, and a recreated venv is re-customized)
 2. Installs dependencies (`numpy<2`, `opencv-python`, `tqdm`) and `insightface`
 3. **Replaces** the CPU-only `onnxruntime` wheel with the local MIGraphX build
 4. Verifies that `MIGraphXExecutionProvider` is registered

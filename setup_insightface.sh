@@ -6,6 +6,67 @@ echo "=== 1. Creating Python Virtual Environment ==="
 python3 -m venv insight_env
 source insight_env/bin/activate
 
+echo "=== 1b. Customizing venv activate for the MIGraphX compile cache ==="
+# `python3 -m venv` generates a pristine activate script, so this block must
+# be (re)applied on every fresh venv. Idempotent: guarded by a marker comment.
+customize_venv_activate() {
+    local activate="$1"
+    local marker="# >>> insightface-migraphx-customization >>>"
+    if grep -qF "$marker" "$activate"; then
+        echo "activate is already customized. Skipping."
+        return
+    fi
+    cat >> "$activate" <<'CUSTOMIZE'
+
+# >>> insightface-migraphx-customization >>>
+# ONNX Runtime MIGraphX EP compile cache.
+#
+# The onnxruntime 1.31 MIGraphX EP reports its default migraphx_model_cache_dir
+# as a 2-character string containing literal double quotes ('""'). InsightFace
+# copies provider options from its reference Session onto the per-resolution
+# static Sessions it creates, so that bogus quoted path is passed back in and
+# every static Session dies with:
+#     RuntimeException: 6 : RUNTIME_EXCEPTION : Exception during
+#     initialization: Failed to call function
+# Pointing the EP at a real directory via this env var bypasses the broken
+# default and makes subsequent runs ~40x faster (149s cold -> 3.6s warm).
+if [ -n "${ORT_MIGRAPHX_MODEL_CACHE_PATH:-}" ] ; then
+    _OLD_ORT_MIGRAPHX_MODEL_CACHE_PATH="${ORT_MIGRAPHX_MODEL_CACHE_PATH:-}"
+else
+    ORT_MIGRAPHX_MODEL_CACHE_PATH="$HOME/.cache/migraphx"
+fi
+export ORT_MIGRAPHX_MODEL_CACHE_PATH
+mkdir -p "$ORT_MIGRAPHX_MODEL_CACHE_PATH"
+# <<< insightface-migraphx-customization <<<
+CUSTOMIZE
+}
+
+# `deactivate` in the stock activate only restores VIRTUAL_ENV/PATH/PYTHONHOME/PS1.
+# Add handling for ORT_MIGRAPHX_MODEL_CACHE_PATH so deactivating the venv
+# restores (or clears) it properly instead of leaking the variable.
+if ! grep -qF '_OLD_ORT_MIGRAPHX_MODEL_CACHE_PATH' "$PWD/insight_env/bin/activate"; then
+    python3 - <<'PY'
+from pathlib import Path
+
+p = Path("insight_env/bin/activate")
+text = p.read_text()
+restore = '''    if [ -n "${_OLD_ORT_MIGRAPHX_MODEL_CACHE_PATH:-}" ] ; then
+        ORT_MIGRAPHX_MODEL_CACHE_PATH="${_OLD_ORT_MIGRAPHX_MODEL_CACHE_PATH:-}"
+        export ORT_MIGRAPHX_MODEL_CACHE_PATH
+        unset _OLD_ORT_MIGRAPHX_MODEL_CACHE_PATH
+    else
+        unset ORT_MIGRAPHX_MODEL_CACHE_PATH
+    fi
+'''
+# Insert the restore block right before "unset VIRTUAL_ENV" inside deactivate()
+anchor = "    unset VIRTUAL_ENV"
+assert anchor in text
+p.write_text(text.replace(anchor, restore + anchor, 1))
+print("deactivate() updated")
+PY
+fi
+customize_venv_activate "$PWD/insight_env/bin/activate"
+
 echo "=== 2. Upgrading Pip and Core Dependencies ==="
 pip install --upgrade pip setuptools wheel
 # InsightFace and ONNX models require NumPy < 2.0 to prevent compatibility errors
