@@ -1,6 +1,15 @@
 # InsightFace with AMD GPU (MIGraphX)
 
-Face detection, recognition, and embedding extraction using [InsightFace](https://github.com/deepinsight/insightface), accelerated on AMD GPUs via a custom **MIGraphX** build of ONNX Runtime. Includes a digiKam tagger that writes face regions into image metadata.
+Experimental local prototype for face detection, recognition, and embedding extraction using [InsightFace](https://github.com/deepinsight/insightface), accelerated on AMD GPUs via a custom **MIGraphX** build of ONNX Runtime.
+
+This project is in an early stage: the setup is intentionally specific to one AMD/ROCm environment, the workflows are still being validated, and some features may change as the stack evolves. The digiKam tagger is included as a prototype and should be used cautiously with backups in place.
+
+## Current status
+
+- Early-stage proof-of-concept: not a polished end-user installation
+- Designed for a local AMD GPU + ROCm + custom MIGraphX ONNX Runtime environment
+- Useful for smoke testing and experimentation, especially around provider selection and model caching
+- Some features are still exploratory or unverified, especially metadata output and broader automation
 
 ## Repository layout
 
@@ -121,7 +130,7 @@ GPU path**. Re-run the swap afterwards (or re-run `./setup_insightface.sh`).
 
 ### Building the MIGraphX onnxruntime
 
-The GPU path is the **MIGraphX execution provider**, built from source. The
+The GPU path is the **MIGraphX execution provider**, built from source, refer to  https://github.com/stoflom/onnxruntime . The
 system libraries live in `/usr/local/lib64`:
 
 ```bash
