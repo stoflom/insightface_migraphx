@@ -1,0 +1,6 @@
+insight_env/
+__pycache__
+*.db
+.env
+*.log
+*.txt
