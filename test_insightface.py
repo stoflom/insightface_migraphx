@@ -1,4 +1,5 @@
 import cv2
+import onnxruntime  #only for printing the available providers below
 import insightface
 from insightface.app import FaceAnalysis
 
@@ -9,6 +10,9 @@ app = FaceAnalysis(name='buffalo_l', providers=[
     'MIGraphXExecutionProvider',  # High Performance AMD Graph Optimizer
     'CPUExecutionProvider'
     ])
+
+print(onnxruntime.get_available_providers())
+
 
 # Prepare the model context (ctx_id=0 points to your primary AMD GPU index)
 app.prepare(ctx_id=0, det_size=(640, 640))
