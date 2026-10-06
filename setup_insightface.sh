@@ -78,6 +78,10 @@ echo "=== 2. Upgrading Pip and Core Dependencies ==="
 pip install --upgrade pip setuptools wheel
 # InsightFace and ONNX models require NumPy < 2.0 to prevent compatibility errors
 pip install "numpy<2" opencv-python tqdm
+# The face-review app scans the photo library directly, and ~70% of that
+# library is Pentax RAW (.PEF). The detector sidecar decodes in-process, so it
+# needs rawpy, which the base InsightFace install does not pull in.
+pip install rawpy
 
 echo "=== 3. Installing InsightFace ==="
 pip install insightface
