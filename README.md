@@ -44,7 +44,7 @@ restriction applies to the **pretrained model weights**.
 ## Requirements
 
 - Python 3.10+
-- NumPy 1.x (InsightFace is not compatible with NumPy 2.0)
+- NumPy 2.x (insightface 0.7.3's dependency tree requires it)
 - An AMD GPU with ROCm, and a locally built MIGraphX onnxruntime wheel at
   `../onnxruntime/onnxruntime/build/Linux/Release/dist/onnxruntime_migraphx-*.whl`
   (see [Building the MIGraphX onnxruntime](#building-the-migraphx-onnxruntime) if you don't have one yet)
@@ -60,7 +60,7 @@ The script:
 1. Creates the `insight_env` virtual environment (kept **pristine**) and
    generates `activate.custom` from a fresh copy of its `activate` script,
    patched to export `ORT_MIGRAPHX_MODEL_CACHE_PATH`
-2. Installs dependencies (`numpy<2`, `opencv-python`, `tqdm`) and `insightface`
+2. Installs dependencies (`numpy`, `opencv-python-headless`, `tqdm`, `flatbuffers`, `rawpy`) and `insightface`
 3. **Replaces** the CPU-only `onnxruntime` wheel with the local MIGraphX build
 4. Verifies that `MIGraphXExecutionProvider` is registered
 5. Downloads and extracts the `buffalo_l` model pack to `~/.insightface/models/`

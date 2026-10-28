@@ -1,8 +1,12 @@
 #!/bin/bash
 set -e
 
+# Directory this script lives in. The final hint points here, not at $PWD,
+# which step 5 has cd'd into the model directory by then.
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
 echo "=== 1. Creating Python Virtual Environment ==="
-# InsightFace requires Python 3.10+ and NumPy 1.x
+# InsightFace requires Python 3.10+
 python3 -m venv insight_env
 source insight_env/bin/activate
 
@@ -76,8 +80,15 @@ customize_venv_activate "$PWD/activate.custom"
 
 echo "=== 2. Upgrading Pip and Core Dependencies ==="
 pip install --upgrade pip setuptools wheel
-# InsightFace and ONNX models require NumPy < 2.0 to prevent compatibility errors
-pip install "numpy<2" opencv-python tqdm
+# Let pip resolve the newest NumPy 2.x: insightface 0.7.3 declares plain
+# `numpy`, and its dependency tree (scipy, contourpy, ml-dtypes,
+# albumentations -> opencv) now requires NumPy >= 2, so the old "numpy<2"
+# pin (a relic of the onnxruntime 1.31 era) fought every other package and
+# was silently reverted by the insightface install anyway.
+# opencv-python-headless: the variant albumentations pulls in, so only one
+# cv2 ends up installed. flatbuffers: a declared dep of the onnxruntime
+# wheel that step 3b installs with --no-deps.
+pip install numpy opencv-python-headless tqdm flatbuffers
 # The face-review app scans the photo library directly, and ~70% of that
 # library is Pentax RAW (.PEF). The detector sidecar decodes in-process, so it
 # needs rawpy, which the base InsightFace install does not pull in.
@@ -87,8 +98,9 @@ echo "=== 3. Installing InsightFace ==="
 pip install insightface
 
 echo "=== 3b. Swapping the CPU onnxruntime wheel for the MIGraphX build ==="
-# `pip install insightface` pulls the CPU-only `onnxruntime` wheel from PyPI.
-# It has to go: that wheel's C extension is named
+# insightface 0.7.3 no longer declares onnxruntime as a dependency, so this
+# is usually a no-op; but if a CPU-only `onnxruntime` wheel is present (older
+# insightface, or a manual install), it has to go: that wheel's C extension is named
 # onnxruntime_pybind11_state.cpython-<ver>-x86_64-linux-gnu.so, and CPython's
 # import machinery prefers the tagged name over the plain
 # onnxruntime_pybind11_state.so shipped by the MIGraphX wheel. The result is a
@@ -141,5 +153,5 @@ unzip -o buffalo_l.zip -d buffalo_l
 
 echo "=== Setup Complete ==="
 echo "To begin your hobby project, activate your environment with:"
-echo "source $(pwd)/activate.custom"
+echo "source $SCRIPT_DIR/activate.custom"
 

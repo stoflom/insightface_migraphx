@@ -1,7 +1,3 @@
-# This is a customized venev activation script to enable the MiGraphX onnxruntime
-#  you can source this file directly to setup the venv
-#
-# ***Original script below***
 # This file must be used with "source bin/activate" *from bash*
 # You cannot run it directly
 
@@ -36,7 +32,6 @@ deactivate () {
     else
         unset ORT_MIGRAPHX_MODEL_CACHE_PATH
     fi
-
     unset VIRTUAL_ENV
     unset VIRTUAL_ENV_PROMPT
     if [ ! "${1:-}" = "nondestructive" ] ; then
@@ -83,6 +78,10 @@ if [ -z "${VIRTUAL_ENV_DISABLE_PROMPT:-}" ] ; then
     export PS1
 fi
 
+# Call hash to forget past commands. Without forgetting
+# past commands the $PATH changes we made may not be respected
+hash -r 2> /dev/null || true
+
 # >>> insightface-migraphx-customization >>>
 # ONNX Runtime MIGraphX EP compile cache.
 #
@@ -103,7 +102,3 @@ fi
 export ORT_MIGRAPHX_MODEL_CACHE_PATH
 mkdir -p "$ORT_MIGRAPHX_MODEL_CACHE_PATH"
 # <<< insightface-migraphx-customization <<<
-
-# Call hash to forget past commands. Without forgetting
-# past commands the $PATH changes we made may not be respected
-hash -r 2> /dev/null || true
