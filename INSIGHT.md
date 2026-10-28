@@ -5,8 +5,8 @@ Detect faces in an image and extract their 512-d **face embeddings**
 and used to match the same person across an entire photo library — entirely
 outside any photo-editing application.
 
-> Run this inside the project venv (`source insight_env/bin/activate`),
-> which also exports `ORT_MIGRAPHX_MODEL_CACHE_PATH` (see
+> Run this inside the project venv (`source activate.custom`),
+> which exports `ORT_MIGRAPHX_MODEL_CACHE_PATH` (see
 > [README](README.md#migraphx-compile-cache)).
 
 ## Detect and extract

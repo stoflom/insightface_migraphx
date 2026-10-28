@@ -61,7 +61,8 @@ The script:
    generates `activate.custom` from a fresh copy of its `activate` script,
    patched to export `ORT_MIGRAPHX_MODEL_CACHE_PATH`
 2. Installs dependencies (`numpy`, `opencv-python-headless`, `tqdm`, `flatbuffers`, `rawpy`) and `insightface`
-3. **Replaces** the CPU-only `onnxruntime` wheel with the local MIGraphX build
+3. **Installs** the local MIGraphX onnxruntime build (removing a CPU-only
+   `onnxruntime` wheel first, if one is present)
 4. Verifies that `MIGraphXExecutionProvider` is registered
 5. Downloads and extracts the `buffalo_l` model pack to `~/.insightface/models/`
 
@@ -78,8 +79,9 @@ the only way to activate the environment: it exports
 `ORT_MIGRAPHX_MODEL_CACHE_PATH` (see
 [MIGraphX compile cache](#migraphx-compile-cache)). The venv's own
 `insight_env/bin/activate` is left pristine and does **not** set that
-variable, so sourcing it gives you the venv but a broken/slow GPU path —
-don't use it.
+variable, so sourcing it gives you the venv but **no compile cache** —
+every run re-compiles the models (minutes instead of seconds). Don't use
+it.
 
 `activate.custom` starts life as a copy of `insight_env/bin/activate`, so it
 may stop working if an upgrade changes the venv's activation script into an
@@ -99,8 +101,8 @@ execution providers. Confirm `MIGraphXExecutionProvider` is in the list.
 ### Tag images for digiKam
 
 ```bash
-sudo dnf install perl-Image-ExifTool   # Fedora/RHEL
-python digikam_migraphx_tagger.py
+sudo dnf install perl-Image-ExifTool   # Fedora/RHEL, one-time
+python digikam_migraphx_tagger.py      # interactive: prompts for the folder to tag
 ```
 
 **Note on coordinate systems:** to write face regions that digiKam reads
@@ -123,8 +125,11 @@ yields a 512-d embedding that can be stored in a lightweight vector database
 pip install -U insightface
 ```
 
-This will reinstall the CPU-only `onnxruntime` wheel and **break the MIGraphX
-GPU path**. Re-run the swap afterwards (or re-run `./setup_insightface.sh`).
+insightface 0.7.3 does not declare `onnxruntime` as a dependency, so an
+upgrade does **not** touch the MIGraphX wheel — the GPU path survives. Re-run
+the provider verification below afterwards. (If a future insightface release
+starts depending on `onnxruntime`, re-run `./setup_insightface.sh` to restore
+the swap.)
 
 ## MIGraphX notes
 
@@ -134,12 +139,13 @@ The GPU path is the **MIGraphX execution provider**, built from source, refer to
 system libraries live in `/usr/local/lib64`:
 
 ```bash
-ls /usr/local/lib64/libonnxruntime.so*                          # e.g. libonnxruntime.so.1.31.0
+ls /usr/local/lib64/libonnxruntime.so*                          # e.g. libonnxruntime.so.1.32.0
 ls /usr/local/lib64/libonnxruntime_providers_migraphx.so
 ```
 
-The venv must use the locally built wheel, which **replaces** the CPU-only
-`onnxruntime` wheel that `pip install insightface` pulls in:
+The venv must use the locally built wheel (insightface 0.7.3 does not pull in
+`onnxruntime` itself; the only danger is a CPU-only wheel already present in
+the venv):
 
 ```bash
 source activate.custom
@@ -148,14 +154,15 @@ pip install --no-deps --force-reinstall \
     ../onnxruntime/onnxruntime/build/Linux/Release/dist/onnxruntime_migraphx-*.whl
 ```
 
-`--no-deps` matters: without it pip re-resolves dependencies and can
-reinstall the CPU `onnxruntime` wheel, undoing the swap.
+`--no-deps` keeps the install minimal: the wheel's only declared deps are
+flatbuffers, numpy, packaging, and protobuf (all installed by the setup
+script), so nothing it would pull in could undo the swap.
 
 **Why the swap is needed at all:** the PyPI wheel's C extension is named
 `onnxruntime_pybind11_state.cpython-<ver>-x86_64-linux-gnu.so`, and CPython's
 import machinery prefers that tagged name over the plain
 `onnxruntime_pybind11_state.so` from the MIGraphX wheel. The result is a
-CPU-only extension loading while the package still reports 1.31.0, so
+CPU-only extension loading while the package still reports a version, so
 `MIGraphXExecutionProvider` never registers and every Session silently runs
 on CPU.
 
@@ -163,7 +170,7 @@ on CPU.
 
 ```bash
 python -c "import onnxruntime as ort; print(ort.__version__, ort.get_available_providers(), ort.get_device())"
-# 1.31.0 ['MIGraphXExecutionProvider', 'CPUExecutionProvider'] CPU-MIGRAPHX
+# 1.32.0 ['MIGraphXExecutionProvider', 'CPUExecutionProvider'] CPU-MIGRAPHX
 ```
 
 Then select the provider in your scripts:
@@ -195,19 +202,16 @@ the first run. Sourcing `activate.custom` exports
 compiled `.mxr` files, so only the first run is slow (~149 s cold vs ~3.6 s
 warm).
 
-This is a **correctness** requirement, not just a speed one. The 1.31
-MIGraphX EP reports its default `migraphx_model_cache_dir` as the two-character
-string `""` (literal double quotes), and InsightFace copies provider options
-from its reference Session onto the per-resolution static Sessions it creates.
-That bogus quoted path is therefore passed back in, and every static Session
-dies with:
+Without the variable the EP falls back to its built-in default for
+`migraphx_model_cache_dir`, which is the two-character string `""` (literal
+double quotes — visible in the `Applied providers` options InsightFace
+prints). The EP then caches nothing, so **every** run pays the full compile
+cost. On the older stack (onnxruntime 1.31 + insightface with
+per-resolution static Sessions) that quoted default was also fatal: it was
+copied onto the cloned Sessions and killed each one with
+`RuntimeException: 6 : RUNTIME_EXCEPTION : Exception during initialization:
+Failed to call function`. insightface 0.7.3 no longer clones Sessions, so
+today this is a speed problem, not a correctness one.
 
-```
-RuntimeException: 6 : RUNTIME_EXCEPTION : Exception during initialization:
-Failed to call function
-```
-
-Pointing the EP at a real directory via `ORT_MIGRAPHX_MODEL_CACHE_PATH`
-bypasses the broken default. If you ever run without sourcing `activate.custom`,
-either export that variable yourself or pass `static_shape_sessions=False` to
-`FaceAnalysis` so the reference Session is reused instead of cloned.
+If you ever run without sourcing `activate.custom`, export
+`ORT_MIGRAPHX_MODEL_CACHE_PATH` yourself to keep warm runs fast.

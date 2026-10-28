@@ -32,15 +32,18 @@ customize_venv_activate() {
 # >>> insightface-migraphx-customization >>>
 # ONNX Runtime MIGraphX EP compile cache.
 #
-# The onnxruntime 1.31 MIGraphX EP reports its default migraphx_model_cache_dir
-# as a 2-character string containing literal double quotes ('""'). InsightFace
-# copies provider options from its reference Session onto the per-resolution
-# static Sessions it creates, so that bogus quoted path is passed back in and
-# every static Session dies with:
+# Without this env var the MIGraphX EP's default migraphx_model_cache_dir is
+# a 2-character string containing literal double quotes ('""'), and the EP
+# then caches nothing, so every run re-compiles all graphs with the ROCm
+# compiler (~149s). (On the older stack — onnxruntime 1.31 + insightface's
+# per-resolution static Sessions — that quoted default was copied onto the
+# cloned Sessions and killed each one with
 #     RuntimeException: 6 : RUNTIME_EXCEPTION : Exception during
 #     initialization: Failed to call function
-# Pointing the EP at a real directory via this env var bypasses the broken
-# default and makes subsequent runs ~40x faster (149s cold -> 3.6s warm).
+# insightface 0.7.3 no longer clones Sessions, so today this is a speed
+# issue, not a correctness one.)
+# Pointing the EP at a real directory via this env var caches the compiled
+# .mxr files and makes subsequent runs ~40x faster (149s cold -> 3.6s warm).
 if [ -n "${ORT_MIGRAPHX_MODEL_CACHE_PATH:-}" ] ; then
     _OLD_ORT_MIGRAPHX_MODEL_CACHE_PATH="${ORT_MIGRAPHX_MODEL_CACHE_PATH:-}"
 else
