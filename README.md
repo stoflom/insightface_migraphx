@@ -2,6 +2,24 @@
 
 Experimental local prototype for face detection, recognition, and embedding extraction using [InsightFace](https://github.com/deepinsight/insightface), accelerated on AMD GPUs via a custom **MIGraphX** build of ONNX Runtime.
 
+Based on the insightface python virtual environment installed by [Install](
+https://github.com/deepinsight/insightface/blob/master/python-package/README.md)
+```bash
+python3 -m venv venv
+source venv/bin/activate
+pip install --upgrade pip
+pip install onnx opencv-python onnxruntime tqdm numpy scipy scikit-image requests
+pip install insightface
+```
+
+However in this package the onnxruntime which is used for running the face detection model
+only allows the CPU execution provider, in this repo the onnxruntime is substituted in the venv
+by a custom onnxruntime which also allows the GPU (AMD MiGraphX) as additional Exceution Provider,
+with fallback to the CPU. The customized venv is create by running
+```bash
+setup_insightface.sh
+```
+
 This project is in an early stage: the setup is intentionally specific to one AMD/ROCm environment, the workflows are still being validated, and some features may change as the stack evolves. The digiKam tagger is included as a prototype and should be used cautiously with backups in place.
 
 ## Current status
